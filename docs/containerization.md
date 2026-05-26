@@ -32,7 +32,7 @@ The platform (`fluent-platform`) is a thin orchestrator over the self-containeri
 
 ### Shared Database Model
 
-The platform owns a single shared PostgreSQL container on port 5432. All services connect to it via the internal network (Docker Compose) or the shared pod network (Podman). The database is initialized by `db/init/init-db.sql` on first run, which creates roles, schemas, and default privileges.
+The platform owns a single shared PostgreSQL container on port 5432. All services connect to it via the internal network (Docker Compose) or the shared pod network (Podman). The database is initialized by `db/init/init-db.sql` on first run, which creates roles, schemas, and default privileges. Individual repos (`fluent-api`, `fluent-ai`) embed a vendored copy of this script so that contributors can work on a single service in standalone mode without cloning the platform repository.
 
 When running an individual repo in standalone mode (`./fapi.sh up`, `./fai.sh up`), that repo brings up its own PostgreSQL container on a non-conflicting port (e.g., 5433 for fluent-ai). This allows isolated development without the full ecosystem.
 

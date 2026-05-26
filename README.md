@@ -187,16 +187,18 @@ Each sibling repo also has its own `.env.example` - the `setup` command copies t
 
 ## Database Architecture
 
-The platform owns a single shared PostgreSQL instance initialized by `db/init/init-db.sql`. It uses a multi-schema design with role-based access control:
+The platform owns a single shared PostgreSQL instance initialized by `db/init/init-db.sql`. It uses a multi-schema design with decentralized role-based access control — each service user owns the schema it manages:
 
-| Schema     | Purpose                        | Write Access       | Read Access          |
+| Schema     | Purpose                        | Owner              | Read Access          |
 |------------|--------------------------------|--------------------|----------------------|
-| `public`   | Core application data          | web_user           | web_user, ai_user    |
-| `pgboss`   | Job queue (pg-boss)            | web_user, ai_user  | web_user, ai_user    |
+| `public`   | Core application data          | postgres           | web_user, ai_user    |
+| `pgboss`   | Job queue (pg-boss)            | web_user           | web_user, ai_user    |
 | `ai`       | AI service data                | ai_user            | ai_user              |
 | `drizzle`  | Migration tracking             | migrations         | migrations           |
 
 Login users: `db_admin`, `migrations`, `web_user`, `ai_user`. The init script sets up all roles, schemas, and default privileges automatically on first run.
+
+Each downstream repo (`fluent-api`, `fluent-ai`) contains a **vendored copy** of this init script at `db/init/01-init-db.sql` so that contributors can clone a single repo and run standalone development without needing the full `fluent-platform` repository. These copies should not be edited directly — maintainers can re-sync them by running `./scripts/vendor-db-init.sh` (or `.ps1` on Windows) in the target repo.
 
 ## Container Security
 

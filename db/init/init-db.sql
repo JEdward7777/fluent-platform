@@ -1,5 +1,7 @@
 -- PostgreSQL roles and privileges for local development.
--- This file is executed automatically on first database initialization
+-- CANONICAL SOURCE — vendored into fluent-api and fluent-ai.
+-- Do not edit downstream copies directly; update this file and re-vendor.
+-- Executed automatically on first database initialization
 -- via the postgres docker-entrypoint-initdb.d mechanism.
 -- ================================================================
 -- BOOTSTRAP: Run as Azure admin account (or superuser) for PROD
@@ -55,14 +57,16 @@ CREATE SCHEMA IF NOT EXISTS ai;
 
 -- ================================================================
 -- SECTION 4: SCHEMA OWNERSHIP
+-- Decentralized model: each service user owns the schema it manages.
+-- public retains postgres ownership (superuser default).
 -- Note: on Azure Flexible Server, run these as the Azure admin
--- account since true superuser is unavailable
+-- account since true superuser is unavailable.
 -- ================================================================
 
-ALTER SCHEMA public  OWNER TO db_admin;
-ALTER SCHEMA pgboss  OWNER TO db_admin;
-ALTER SCHEMA drizzle OWNER TO db_admin;
-ALTER SCHEMA ai      OWNER TO db_admin;
+-- public already exists; postgres retains ownership.
+ALTER SCHEMA pgboss  OWNER TO web_user;
+ALTER SCHEMA drizzle OWNER TO migrations;
+ALTER SCHEMA ai      OWNER TO ai_user;
 
 
 -- ================================================================
@@ -81,16 +85,23 @@ GRANT USAGE ON SCHEMA drizzle TO role_migrations;
 -- ai: ai service and migrations need access
 GRANT USAGE ON SCHEMA ai      TO role_ai_data, role_migrations;
 
+-- db_admin: convenience DBA account for local inspection; not a runtime user
+GRANT USAGE ON SCHEMA public, pgboss, ai, drizzle TO db_admin;
+
 
 -- ================================================================
 -- SECTION 6: DDL RIGHTS (CREATE within schema)
--- Only migrations needs to create/alter/drop objects
+-- Only migrations needs to create/alter/drop objects across all schemas.
+-- Service roles also need CREATE on their own schemas for runtime table creation.
 -- ================================================================
 
 GRANT CREATE ON SCHEMA public  TO role_migrations;
 GRANT CREATE ON SCHEMA pgboss  TO role_migrations;
 GRANT CREATE ON SCHEMA drizzle TO role_migrations;
 GRANT CREATE ON SCHEMA ai      TO role_migrations;
+
+GRANT CREATE ON SCHEMA pgboss TO role_pgboss_user;
+GRANT CREATE ON SCHEMA ai     TO role_ai_data;
 
 
 -- ================================================================
@@ -129,31 +140,52 @@ GRANT ALL ON ALL SEQUENCES IN SCHEMA ai TO role_migrations;
 
 -- ================================================================
 -- SECTION 8: DEFAULT PRIVILEGES FOR FUTURE OBJECTS
--- Scoped to the creating role to ensure new tables are covered
+-- Scoped to the creating role to ensure new tables are covered.
+-- We set defaults for both the service owner and migrations so
+-- grants apply regardless of who creates objects.
 -- ================================================================
 
--- When migrations creates tables in public
-ALTER DEFAULT PRIVILEGES FOR ROLE role_migrations IN SCHEMA public
+-- When postgres or migrations creates tables in public
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES    TO role_web_data;
-ALTER DEFAULT PRIVILEGES FOR ROLE role_migrations IN SCHEMA public
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   GRANT USAGE, SELECT                  ON SEQUENCES TO role_web_data;
 
--- When migrations creates tables in public — ai reader gets SELECT
-ALTER DEFAULT PRIVILEGES FOR ROLE role_migrations IN SCHEMA public
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   GRANT SELECT ON TABLES    TO role_ai_reader;
-ALTER DEFAULT PRIVILEGES FOR ROLE role_migrations IN SCHEMA public
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   GRANT SELECT ON SEQUENCES TO role_ai_reader;
 
--- When migrations creates tables in pgboss
-ALTER DEFAULT PRIVILEGES FOR ROLE role_migrations IN SCHEMA pgboss
+ALTER DEFAULT PRIVILEGES FOR ROLE migrations IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES    TO role_web_data;
+ALTER DEFAULT PRIVILEGES FOR ROLE migrations IN SCHEMA public
+  GRANT USAGE, SELECT                  ON SEQUENCES TO role_web_data;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE migrations IN SCHEMA public
+  GRANT SELECT ON TABLES    TO role_ai_reader;
+ALTER DEFAULT PRIVILEGES FOR ROLE migrations IN SCHEMA public
+  GRANT SELECT ON SEQUENCES TO role_ai_reader;
+
+-- When web_user or migrations creates tables in pgboss
+ALTER DEFAULT PRIVILEGES FOR ROLE web_user IN SCHEMA pgboss
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES    TO role_pgboss_user;
-ALTER DEFAULT PRIVILEGES FOR ROLE role_migrations IN SCHEMA pgboss
+ALTER DEFAULT PRIVILEGES FOR ROLE web_user IN SCHEMA pgboss
   GRANT USAGE, SELECT                  ON SEQUENCES TO role_pgboss_user;
 
--- When migrations creates tables in ai
-ALTER DEFAULT PRIVILEGES FOR ROLE role_migrations IN SCHEMA ai
+ALTER DEFAULT PRIVILEGES FOR ROLE migrations IN SCHEMA pgboss
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES    TO role_pgboss_user;
+ALTER DEFAULT PRIVILEGES FOR ROLE migrations IN SCHEMA pgboss
+  GRANT USAGE, SELECT                  ON SEQUENCES TO role_pgboss_user;
+
+-- When ai_user or migrations creates tables in ai
+ALTER DEFAULT PRIVILEGES FOR ROLE ai_user IN SCHEMA ai
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES    TO role_ai_data;
-ALTER DEFAULT PRIVILEGES FOR ROLE role_migrations IN SCHEMA ai
+ALTER DEFAULT PRIVILEGES FOR ROLE ai_user IN SCHEMA ai
   GRANT USAGE, SELECT                  ON SEQUENCES TO role_ai_data;
 
--- drizzle schema: no default privileges for web_user — intentionally locked out
+ALTER DEFAULT PRIVILEGES FOR ROLE migrations IN SCHEMA ai
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES    TO role_ai_data;
+ALTER DEFAULT PRIVILEGES FOR ROLE migrations IN SCHEMA ai
+  GRANT USAGE, SELECT                  ON SEQUENCES TO role_ai_data;
+
+-- drizzle schema: no default privileges for web_user -- intentionally locked out
