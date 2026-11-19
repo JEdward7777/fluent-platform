@@ -4,6 +4,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# The standalone reviewer only needs the API checkout and Docker Compose.
+if [[ "${1:-}" == license-reviewer ]]; then
+  shift
+  reviewer="${API_CONTEXT:-../fluent-api}/license-reviewer.sh"
+  if [[ ! -x "$reviewer" ]]; then
+    echo "License reviewer launcher not found at $reviewer. Check the API checkout or API_CONTEXT." >&2
+    exit 1
+  fi
+  exec "$reviewer" "$@"
+fi
+
 # ── Runtime detection (prefer native Podman pods) ─────────────────────────────
 
 detect_runtime() {
@@ -836,6 +847,9 @@ Database:
   db:seed [target]        Run seeds (api, ai, or all)
   db:psql                 Open psql session
   db:studio               Launch Drizzle Studio on the host
+
+License review:
+  license-reviewer [args]  Launch the standalone reviewer from the API checkout
 
 Lifecycle:
   clean [service]         Remove containers and volumes
