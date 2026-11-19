@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# The standalone reviewer only needs the API checkout and Docker Compose.
+# The standalone reviewer selects its runtime in the API checkout.
 if [[ "${1:-}" == license-reviewer ]]; then
   shift
   reviewer="${API_CONTEXT:-../fluent-api}/license-reviewer.sh"
